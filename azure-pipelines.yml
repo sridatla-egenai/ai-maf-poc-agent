@@ -4,96 +4,128 @@ trigger:
       - main
 
 variables:
-  # Replace these with your values or set them in a variable group in Azure DevOps
-  - name: ACR_NAME
-    value: '<your-acr-name>'
-  - name: IMAGE_NAME
-    value: 'agent-image'
+  # Configure these as pipeline variables or in a Variable Group in Azure DevOps
   - name: AGENT_YAML_PATH
     value: 'agent.yaml'
-  - name: FOUNDRY_API_URL
-    value: '<foundry-api-url-or-leave-empty>'
-  - name: FOUNDRY_PROJECT
-    value: '<foundry-project>'
+  - name: FOUNDRY_PROJECT_NAME
+    value: 'adusa-poc-agent'  # e.g., 'my-ai-project'
+  - name: FOUNDRY_RESOURCE_GROUP
+    value: 'ad-usa-poc'  # Azure resource group where Foundry is deployed
+  - name: FOUNDRY_HUB_NAME
+    value: '<your-foundry-hub-name>'  # The Foundry hub/workspace name
 
 stages:
 
-- stage: Build
-  displayName: Build and push image
+- stage: Validate
+  displayName: Validate and publish agent
   jobs:
-  - job: Build
+  - job: PublishAgent
     pool:
       vmImage: 'ubuntu-latest'
     steps:
     - checkout: self
-
-    # Uses an Azure DevOps service connection to authenticate with Azure
-    - task: AzureCLI@2
-      displayName: Build and push Docker image to ACR
+    
+    - task: UsePythonVersion@0
       inputs:
-        azureSubscription: '$(AZURE_SERVICE_CONNECTION)' # Create an Azure service connection and put its name here
+        versionSpec: '3.10'
+      displayName: 'Use Python 3.10'
+    
+    - bash: |
+        pip install azure-ai-projects azure-identity pyyaml
+      displayName: 'Install dependencies'
+    
+    - task: AzureCLI@2
+      displayName: Publish agent to Azure AI Foundry (Python SDK)
+      inputs:
+        azureSubscription: '$(AZURE_SERVICE_CONNECTION)'  # Azure service connection name (configure in DevOps)
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
           set -euo pipefail
-          echo "Logging into ACR $(ACR_NAME)..."
-          az acr login --name $(ACR_NAME)
-          ACR_LOGIN="$(ACR_NAME).azurecr.io"
-          IMAGE_TAG="$ACR_LOGIN/$(IMAGE_NAME):$(Build.BuildId)"
-          echo "Building $IMAGE_TAG"
-          docker build -t "$IMAGE_TAG" .
-          echo "Pushing $IMAGE_TAG"
-          docker push "$IMAGE_TAG"
-          echo "##vso[task.setvariable variable=IMAGE_TAG]$IMAGE_TAG"
-
-- stage: Deploy
-  displayName: Deploy to Azure AI Foundry (placeholder)
-  dependsOn: Build
-  jobs:
-  - job: Deploy
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-    - checkout: self
-
-    - bash: |
-        set -euo pipefail
-        echo "Deploy placeholder for Azure AI Foundry"
-        echo "IMAGE_TAG=$(IMAGE_TAG)"
-
-        if [ "$(FOUNDRY_API_URL)" = "<foundry-api-url-or-leave-empty>" ] || [ -z "$(FOUNDRY_API_URL)" ]; then
-          echo "FOUNDRY_API_URL is not configured. Update pipeline variables or variable group with the correct endpoint."
-          echo "Skipping deploy stage (no Foundry endpoint configured)."
-          exit 0
-        fi
-
-        if [ -z "$(FOUNDRY_API_KEY)" ]; then
-          echo "FOUNDRY_API_KEY pipeline secret not set. Please set this secret in your pipeline or variable group."
-          exit 1
-        fi
-
-        if [ ! -f "$(AGENT_YAML_PATH)" ]; then
-          echo "Agent YAML not found at $(AGENT_YAML_PATH)"
-          exit 1
-        fi
-
-        # Base64-encode the agent YAML to avoid quoting/escaping issues in JSON payloads
-        AGENT_YAML_B64=$(base64 -w0 < "$(AGENT_YAML_PATH)")
-
-        # Build a generic JSON payload; adapt this to your Foundry API/CLI contract
-        PAYLOAD=$(jq -n --arg project "$(FOUNDRY_PROJECT)" --arg image "$(IMAGE_TAG)" --arg agent_b64 "$AGENT_YAML_B64" '{project:$project, image:$image, agentYamlBase64:$agent_b64}')
-
-        echo "Posting deployment to $(FOUNDRY_API_URL)/deployments"
-        # NOTE: Replace /deployments and payload shape with the exact Foundry API or CLI call
-        HTTP_CODE=$(curl -s -o /tmp/foundry_resp.json -w "%{http_code}" -X POST "$(FOUNDRY_API_URL)/deployments" \
-          -H "Authorization: Bearer $(FOUNDRY_API_KEY)" \
-          -H "Content-Type: application/json" \
-          -d "$PAYLOAD")
-
-        echo "Foundry API returned HTTP $HTTP_CODE"
-        cat /tmp/foundry_resp.json || true
-        if [ "$HTTP_CODE" -ge 400 ]; then
-          echo "Foundry deploy failed (HTTP $HTTP_CODE)"
-          exit 1
-        fi
-      displayName: Deploy to Azure AI Foundry (placeholder)
+          
+          # Validate inputs
+          if [ ! -f "$(AGENT_YAML_PATH)" ]; then
+            echo "ERROR: Agent YAML not found at $(AGENT_YAML_PATH)"
+            exit 1
+          fi
+          
+          echo "Agent YAML: $(AGENT_YAML_PATH)"
+          echo "Project: $(FOUNDRY_PROJECT_NAME)"
+          echo "Resource group: $(FOUNDRY_RESOURCE_GROUP)"
+          echo "Hub: $(FOUNDRY_HUB_NAME)"
+          
+          # Create a Python script to deploy the agent
+          cat > deploy_agent.py <<'EOF'
+          import sys
+          import yaml
+          from azure.ai.projects import AIProjectClient
+          from azure.identity import DefaultAzureCredential
+          
+          # Read config from environment
+          resource_group = sys.argv[1]
+          hub_name = sys.argv[2]
+          project_name = sys.argv[3]
+          agent_yaml_path = sys.argv[4]
+          
+          # Read agent definition from YAML
+          with open(agent_yaml_path, 'r') as f:
+              agent_def = yaml.safe_load(f)
+          
+          print(f"Loading agent from: {agent_yaml_path}")
+          print(f"Agent name: {agent_def.get('name', 'Agent')}")
+          print(f"Connecting to Foundry Hub: {hub_name}, Project: {project_name}, Resource Group: {resource_group}")
+          
+          # Initialize Azure AI Projects client
+          try:
+              client = AIProjectClient(
+                  credential=DefaultAzureCredential(),
+                  resource_group_name=resource_group,
+                  project_name=project_name,
+                  hub_name=hub_name
+              )
+              print("✓ Connected to Azure AI Foundry")
+          except Exception as e:
+              print(f"✗ Failed to connect to Foundry: {e}")
+              sys.exit(1)
+          
+          # Prepare agent definition (convert YAML structure to SDK format)
+          try:
+              model_id = agent_def.get('model', {}).get('id')
+              if not model_id:
+                  print("ERROR: model.id is required in agent.yaml")
+                  sys.exit(1)
+              
+              agent_create_params = {
+                  'name': agent_def.get('name', 'Agent'),
+                  'instructions': agent_def.get('instructions', ''),
+                  'model': model_id,
+              }
+              
+              # Add optional fields
+              if 'tools' in agent_def:
+                  agent_create_params['tools'] = agent_def.get('tools', [])
+              if 'metadata' in agent_def:
+                  agent_create_params['metadata'] = agent_def.get('metadata', {})
+              
+              # Create or update agent
+              agent = client.agents.create_agent(**agent_create_params)
+              print(f"✓ Agent deployed successfully!")
+              print(f"  Agent ID: {agent.id}")
+              print(f"  Agent Name: {agent.name}")
+              sys.exit(0)
+          except Exception as e:
+              print(f"✗ Failed to deploy agent: {e}")
+              import traceback
+              traceback.print_exc()
+              sys.exit(1)
+          EOF
+          
+          # Run the deployment script
+          python deploy_agent.py \
+            "$(FOUNDRY_RESOURCE_GROUP)" \
+            "$(FOUNDRY_HUB_NAME)" \
+            "$(FOUNDRY_PROJECT_NAME)" \
+            "$(AGENT_YAML_PATH)"
+          
+          echo "Agent published successfully!"
+          echo "##vso[task.setvariable variable=DEPLOYMENT_SUCCESS]true"
