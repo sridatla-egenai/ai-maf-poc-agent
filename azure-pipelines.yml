@@ -1,0 +1,99 @@
+trigger:
+  branches:
+    include:
+      - main
+
+variables:
+  # Replace these with your values or set them in a variable group in Azure DevOps
+  - name: ACR_NAME
+    value: '<your-acr-name>'
+  - name: IMAGE_NAME
+    value: 'agent-image'
+  - name: AGENT_YAML_PATH
+    value: 'agent.yaml'
+  - name: FOUNDRY_API_URL
+    value: '<foundry-api-url-or-leave-empty>'
+  - name: FOUNDRY_PROJECT
+    value: '<foundry-project>'
+
+stages:
+
+- stage: Build
+  displayName: Build and push image
+  jobs:
+  - job: Build
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+
+    # Uses an Azure DevOps service connection to authenticate with Azure
+    - task: AzureCLI@2
+      displayName: Build and push Docker image to ACR
+      inputs:
+        azureSubscription: '$(AZURE_SERVICE_CONNECTION)' # Create an Azure service connection and put its name here
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          set -euo pipefail
+          echo "Logging into ACR $(ACR_NAME)..."
+          az acr login --name $(ACR_NAME)
+          ACR_LOGIN="$(ACR_NAME).azurecr.io"
+          IMAGE_TAG="$ACR_LOGIN/$(IMAGE_NAME):$(Build.BuildId)"
+          echo "Building $IMAGE_TAG"
+          docker build -t "$IMAGE_TAG" .
+          echo "Pushing $IMAGE_TAG"
+          docker push "$IMAGE_TAG"
+          echo "##vso[task.setvariable variable=IMAGE_TAG]$IMAGE_TAG"
+
+- stage: Deploy
+  displayName: Deploy to Azure AI Foundry (placeholder)
+  dependsOn: Build
+  jobs:
+  - job: Deploy
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+
+    - bash: |
+        set -euo pipefail
+        echo "Deploy placeholder for Azure AI Foundry"
+        echo "IMAGE_TAG=$(IMAGE_TAG)"
+
+        if [ "$(FOUNDRY_API_URL)" = "<foundry-api-url-or-leave-empty>" ] || [ -z "$(FOUNDRY_API_URL)" ]; then
+          echo "FOUNDRY_API_URL is not configured. Update pipeline variables or variable group with the correct endpoint."
+          echo "Skipping deploy stage (no Foundry endpoint configured)."
+          exit 0
+        fi
+
+        if [ -z "$(FOUNDRY_API_KEY)" ]; then
+          echo "FOUNDRY_API_KEY pipeline secret not set. Please set this secret in your pipeline or variable group."
+          exit 1
+        fi
+
+        if [ ! -f "$(AGENT_YAML_PATH)" ]; then
+          echo "Agent YAML not found at $(AGENT_YAML_PATH)"
+          exit 1
+        fi
+
+        # Base64-encode the agent YAML to avoid quoting/escaping issues in JSON payloads
+        AGENT_YAML_B64=$(base64 -w0 < "$(AGENT_YAML_PATH)")
+
+        # Build a generic JSON payload; adapt this to your Foundry API/CLI contract
+        PAYLOAD=$(jq -n --arg project "$(FOUNDRY_PROJECT)" --arg image "$(IMAGE_TAG)" --arg agent_b64 "$AGENT_YAML_B64" '{project:$project, image:$image, agentYamlBase64:$agent_b64}')
+
+        echo "Posting deployment to $(FOUNDRY_API_URL)/deployments"
+        # NOTE: Replace /deployments and payload shape with the exact Foundry API or CLI call
+        HTTP_CODE=$(curl -s -o /tmp/foundry_resp.json -w "%{http_code}" -X POST "$(FOUNDRY_API_URL)/deployments" \
+          -H "Authorization: Bearer $(FOUNDRY_API_KEY)" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD")
+
+        echo "Foundry API returned HTTP $HTTP_CODE"
+        cat /tmp/foundry_resp.json || true
+        if [ "$HTTP_CODE" -ge 400 ]; then
+          echo "Foundry deploy failed (HTTP $HTTP_CODE)"
+          exit 1
+        fi
+      displayName: Deploy to Azure AI Foundry (placeholder)
