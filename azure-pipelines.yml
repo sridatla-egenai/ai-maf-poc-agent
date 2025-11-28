@@ -28,8 +28,9 @@ stages:
       displayName: 'Check Python version'
     
     - bash: |
-        python3 -m venv venv
-        . venv/bin/activate
+        python3 -m venv .venv
+        . .venv/bin/activate
+        python -m pip install --upgrade pip
         pip install -r requirements.txt
-        python scripts/deploy_agent.py "$(FOUNDRY_ENDPOINT)" "$(AGENT_YAML_PATH)"
-      displayName: 'Install dependencies and deploy'
+        .venv/bin/python scripts/deploy_agent.py "$(FOUNDRY_ENDPOINT)" "$(AGENT_YAML_PATH)"
+      displayName: 'Install dependencies and deploy agent'
