@@ -18,8 +18,8 @@ stages:
   displayName: Validate and publish agent
   jobs:
   - job: PublishAgent
-    # pool:
-    #   vmImage: 'ubuntu-latest'
+    pool:
+      vmImage: 'ms-agent-pool'
     steps:
     - checkout: self
     
