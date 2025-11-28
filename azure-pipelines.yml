@@ -18,8 +18,7 @@ stages:
   displayName: Validate and publish agent
   jobs:
   - job: PublishAgent
-    pool:
-      vmImage: 'egen-agent-pool'
+    pool: 'egen-agent-pool'
     steps:
     - checkout: self
     
