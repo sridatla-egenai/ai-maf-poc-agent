@@ -120,36 +120,15 @@ def deploy_agent(
             print("    3. Your credentials have appropriate permissions")
             raise
     
-<<<<<<< Updated upstream
     # Prepare agent creation parameters (no tools)
     try:
         model_id = agent_def['model']['id']
-=======
-    
-    # Prepare agent creation parameters
-    try:
-        model_id = agent_def['model']['id']
-        
-        # Load tools if defined in YAML
-        tools = []
-        if 'tools' in agent_def and agent_def['tools']:
-            print(f"Loading {len(agent_def['tools'])} tool(s)...")
-            from tools.registry import build_tools_from_yaml
-            tools = build_tools_from_yaml(client, agent_def['tools'])
-            print(f"✓ Loaded {len(tools)} tool(s)")
-        
->>>>>>> Stashed changes
         print("Deploying agent to Foundry...")
         agent = client.agents.create_version(
             agent_name=agent_name,
             definition=PromptAgentDefinition(
                 model=model_id,
-<<<<<<< Updated upstream
                 instructions=agent_def.get('instructions', 'You are a helpful assistant that answers general questions')
-=======
-                instructions=agent_def.get('instructions', 'You are a helpful assistant that answers general questions'),
-                tools=tools if tools else None
->>>>>>> Stashed changes
             ),
         )
         result = {
