@@ -1,5 +1,3 @@
-# tools/registry.py
-
 from typing import List, Dict
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import (
@@ -93,25 +91,31 @@ def build_tools_from_yaml(project_client: AIProjectClient, tools_cfg: List[Dict]
                     )
                 )
 
-<<<<<<< Updated upstream
-            # Only pass supported arguments (spec_url, connection_id)
-            if connection_id:
-                tools.append(
-                    OpenApiAgentTool(
-                        spec_url=spec_url,
-                        connection_id=connection_id
-                    )
-                )
-            else:
-                tools.append(
-                    OpenApiAgentTool(
-                        spec_url=spec_url
-                    )
-=======
+            # Handle local file paths
+            spec_content = spec_url
+            if spec_url.startswith("file://"):
+                try:
+                    import json
+                    from pathlib import Path
+                    file_path = spec_url.replace("file://", "")
+                    # Resolve relative to current working directory if needed
+                    if not Path(file_path).is_absolute():
+                        file_path = Path.cwd() / file_path
+                    
+                    with open(file_path, 'r') as f:
+                        # Load as JSON/dict if possible, or string
+                        if file_path.suffix == '.json':
+                            spec_content = json.load(f)
+                        else:
+                            spec_content = f.read()
+                    print(f"Loaded OpenAPI spec from {file_path}")
+                except Exception as e:
+                    raise ValueError(f"Failed to read OpenAPI spec file {spec_url}: {e}")
+
             # Create OpenAPI Definition
             openapi_def = OpenApiFunctionDefinition(
                 name=tool_id,
-                spec=spec_url,
+                spec=spec_content,
                 description=t.get("description", ""),
                 auth=auth
             )
@@ -120,8 +124,8 @@ def build_tools_from_yaml(project_client: AIProjectClient, tools_cfg: List[Dict]
             tools.append(
                 OpenApiAgentTool(
                     openapi=openapi_def
->>>>>>> Stashed changes
                 )
+            )
 
         # 4) MCP Tool
         elif tool_type == "mcp":

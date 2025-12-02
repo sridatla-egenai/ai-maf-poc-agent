@@ -1,4 +1,4 @@
-name: $(Date:yyyyMMdd)$(Rev:.r)-infra
+name: $(Date:yyyyMMdd)$(Rev:.r)-connection
 
 trigger:
   branches:
@@ -9,31 +9,11 @@ trigger:
       - infrastructure/**
       - pipelines/infrastructure-pipeline.yml
 
-# Runtime Parameters
-parameters:
-  - name: deployModule
-    displayName: 'Infrastructure Module to Deploy'
-    type: string
-    default: 'all'
-    values:
-      - all
-      - foundry_connection
-      # Add other modules here as you create them
-
 variables:
-  - name: ENVIRONMENT
-    ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
-      value: 'nonprod'
-    ${{ else }}:
-      value: 'prod'
-  
-  - ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
-    - group: ai-agent-secrets-nonprod
-  - ${{ else }}:
-    - group: ai-agent-secrets-prod
-  
   - name: AZURE_SERVICE_CONNECTION
     value: 'ado-service-connection'
+  - name: BICEPPARAM_FILE
+    value: 'infrastructure/nonprod.bicepparam'
 
 pool:
   name: 'egen-agent-pool'
@@ -42,26 +22,21 @@ steps:
   - checkout: self
   
   - bash: |
-      echo "🚀 Deploying Infrastructure to: $(ENVIRONMENT)"
-      echo "📦 Selected Module: ${{ parameters.deployModule }}"
-      echo "📁 Using variables from: infrastructure/variables/$(ENVIRONMENT).yaml"
+      echo "🔗 Deploying Connection"
+      echo "📄 Using bicepparam: $(BICEPPARAM_FILE)"
     displayName: 'Show deployment info'
   
   - task: AzureCLI@2
-    displayName: 'Deploy Infrastructure'
+    displayName: 'Deploy weathertool connection'
     inputs:
       azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
       scriptType: bash
       scriptLocation: inlineScript
       inlineScript: |
-        # Install dependencies
+        # Setup Python environment
         python3 -m venv .venv
-        . .venv/bin/activate
-        pip install pyyaml
+        source .venv/bin/activate
+        pip install -q pyyaml
         
-        # Set API key from secret variable
-        export TODO_API_KEY=$(TODO_API_KEY)
-        
-        # Deploy infrastructure
-        # We pass the selected module as an argument
-        python scripts/deploy_infrastructure.py $(ENVIRONMENT) --module ${{ parameters.deployModule }}
+        # Deploy connection via Bicep
+        python scripts/deploy_infrastructure.py foundry_connection --bicepparam $(BICEPPARAM_FILE)

@@ -1,95 +1,56 @@
 #!/usr/bin/env python3
 """
-Deploy infrastructure using Bicep with YAML variables.
+Deploy infrastructure using Bicep parameter files (.bicepparam).
 
-This script:
-1. Loads environment variables from YAML
-2. Converts them to Bicep parameters
-3. Deploys using Azure CLI
+This script deploys infrastructure modules using native Bicep parameter files.
+All configuration is stored in .bicepparam files.
 
 Usage:
-    python scripts/deploy_infrastructure.py <environment>
+    python scripts/deploy_infrastructure.py <module> --bicepparam <file>
     
 Example:
-    python scripts/deploy_infrastructure.py nonprod
+    python scripts/deploy_infrastructure.py foundry_connection --bicepparam infrastructure/nonprod.bicepparam
 """
 
 import os
 import sys
-import yaml
 import subprocess
 from pathlib import Path
 
-def load_variables(env: str) -> dict:
-    """Load variables from YAML file."""
-    var_file = Path(f"infrastructure/variables/{env}.yaml")
+def deploy_infrastructure(module: str, bicepparam_file: str):
+    """Deploy infrastructure for the given module using Bicep parameter file."""
+    print(f"🚀 Deploying infrastructure module: {module}")
+    print(f"📦 Deploying {module} module")
+    print(f"📄 Using Bicep parameters file: {bicepparam_file}")
     
-    if not var_file.exists():
-        raise FileNotFoundError(f"Variables file not found: {var_file}")
+    # Validate bicepparam file exists
+    if not Path(bicepparam_file).exists():
+        raise FileNotFoundError(f"Bicep parameters file not found: {bicepparam_file}")
     
-    with open(var_file, 'r') as f:
-        return yaml.safe_load(f)
-
-def deploy_infrastructure(env: str, module: str = 'all'):
-    """Deploy infrastructure for the given environment and module."""
-    print(f"🚀 Deploying infrastructure for environment: {env}")
-    print(f"📦 Module: {module}")
-    
-    # Load variables
-    vars = load_variables(env)
-    print(f"✓ Loaded variables from infrastructure/variables/{env}.yaml")
-    
-    # Get API key from environment variable
-    api_key = os.getenv('TODO_API_KEY')
-    if not api_key:
-        raise ValueError("TODO_API_KEY environment variable not set")
-    
-    # Extract configuration
-    resource_group = vars['azure']['resourceGroup']
-    location = vars['azure']['location']
-    project_name = vars['foundry']['projectName']
-    connection_name = vars['connection']['name']
-    target_url = vars['connection']['targetUrl']
-    connection_type = vars['connection']['type']
-    tags = vars.get('tags', {})
-    
-    # Convert tags to Bicep format
-    tags_param = ' '.join([f"{k}={v}" for k, v in tags.items()])
+    # Get resource group from environment or use default
+    resource_group = os.getenv('RESOURCE_GROUP', 'ad-usa-poc')
     
     # Determine template to deploy
-    if module == 'all':
-        template_file = 'infrastructure/main.bicep'
-        print("Deploying ALL infrastructure via main.bicep")
-    elif module == 'foundry_connection':
+    if module == 'foundry_connection':
         template_file = 'infrastructure/modules/foundry_connection/connection.bicep'
-        print(f"Deploying ONLY {module} module")
     else:
-        raise ValueError(f"Unknown module: {module}")
-        
+        raise ValueError(f"Unknown module: {module}. Available: foundry_connection")
+    
+    if not Path(template_file).exists():
+        raise FileNotFoundError(f"Template not found: {template_file}")
+    
     print(f"\n📋 Deployment Configuration:")
     print(f"  Resource Group: {resource_group}")
     print(f"  Template: {template_file}")
+    print(f"  Parameters: {bicepparam_file}")
     
-    # Build Azure CLI command
+    # Build Azure CLI command with bicepparam file
     cmd = [
         'az', 'deployment', 'group', 'create',
         '--resource-group', resource_group,
         '--template-file', template_file,
-        '--parameters',
-        f'location={location}',
-        f'tags={{{tags_param}}}'
+        '--parameters', bicepparam_file
     ]
-    
-    # Add module-specific parameters
-    if module == 'all' or module == 'foundry_connection':
-        cmd.extend([
-            '--parameters',
-            f'projectName={project_name}',
-            f'connectionName={connection_name}',
-            f'targetUrl={target_url}',
-            f'connectionType={connection_type}',
-            f'apiKey={api_key}'
-        ])
     
     print(f"\n🔧 Running deployment...")
     
@@ -105,14 +66,23 @@ def deploy_infrastructure(env: str, module: str = 'all'):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='Deploy infrastructure')
-    parser.add_argument('environment', help='Environment (nonprod/prod)')
-    parser.add_argument('--module', default='all', help='Module to deploy (all, foundry_connection)')
+    parser = argparse.ArgumentParser(
+        description='Deploy infrastructure modules using Bicep parameter files',
+        epilog='Examples:\n'
+               '  python scripts/deploy_infrastructure.py foundry_connection --bicepparam infrastructure/nonprod.bicepparam',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument('module', 
+                        choices=['foundry_connection'],
+                        help='Module to deploy')
+    parser.add_argument('--bicepparam',
+                        required=True,
+                        help='Path to Bicep parameter file (.bicepparam)')
     
     args = parser.parse_args()
     
     try:
-        success = deploy_infrastructure(args.environment, args.module)
+        success = deploy_infrastructure(args.module, args.bicepparam)
         sys.exit(0 if success else 1)
     except Exception as e:
         print(f"\n❌ Error: {e}")

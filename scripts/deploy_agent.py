@@ -120,15 +120,23 @@ def deploy_agent(
             print("    3. Your credentials have appropriate permissions")
             raise
     
-    # Prepare agent creation parameters (no tools)
+    # Prepare agent creation parameters
     try:
         model_id = agent_def['model']['id']
+        
+        # Build tools
+        from .tool_factory import build_tools_from_yaml
+        tools = build_tools_from_yaml(client, agent_def.get('tools', []))
+        if tools:
+            print(f"Attaching {len(tools)} tools to agent...")
+
         print("Deploying agent to Foundry...")
         agent = client.agents.create_version(
             agent_name=agent_name,
             definition=PromptAgentDefinition(
                 model=model_id,
-                instructions=agent_def.get('instructions', 'You are a helpful assistant that answers general questions')
+                instructions=agent_def.get('instructions', 'You are a helpful assistant that answers general questions'),
+                tools=tools
             ),
         )
         result = {

@@ -7,7 +7,6 @@ trigger:
   paths:
     include:
       - agents/**
-      - tools/**
       - scripts/**
       - pipelines/agent-pipeline.yml
     exclude:
@@ -18,25 +17,15 @@ parameters:
   - name: agentFile
     displayName: 'Agent to Deploy'
     type: string
-    default: 'simple-agent.yaml'
+    default: 'weather-agent.yaml'
     values:
-      - simple-agent.yaml
-      # Add other agent YAML files here as you create them
+      - weather-agent.yaml
 
 variables:
-  - name: ENVIRONMENT
-    ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
-      value: 'nonprod'
-    ${{ else }}:
-      value: 'prod'
-  
-  - ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
-    - group: ai-agent-secrets-nonprod
-  - ${{ else }}:
-    - group: ai-agent-secrets-prod
-
   - name: AZURE_SERVICE_CONNECTION
     value: 'ado-service-connection'
+  - name: FOUNDRY_ENDPOINT
+    value: 'https://adusa-poc-agent.services.ai.azure.com/api/projects/adusa-poc-agent'
 
 pool:
   name: 'egen-agent-pool'
@@ -45,31 +34,23 @@ steps:
   - checkout: self
   
   - bash: |
-      echo "🤖 Deploying Agent to: $(ENVIRONMENT)"
+      echo "🤖 Deploying Agent"
       echo "📄 Selected Agent: ${{ parameters.agentFile }}"
+      echo "🔗 Endpoint: $(FOUNDRY_ENDPOINT)"
     displayName: 'Show deployment info'
   
   - task: AzureCLI@2
-    displayName: 'Install dependencies and deploy agent'
+    displayName: 'Deploy agent with tools'
     inputs:
       azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
       scriptType: bash
       scriptLocation: inlineScript
       inlineScript: |
-        # Load environment variables from YAML
-        python3 -c "
-        import yaml
-        with open('infrastructure/variables/$(ENVIRONMENT).yaml') as f:
-            vars = yaml.safe_load(f)
-            print(f\"FOUNDRY_ENDPOINT={vars['foundry']['endpoint']}\")
-        " > env_vars.sh
-        source env_vars.sh
-        
-        # Deploy agent
+        # Setup Python environment
         python3 -m venv .venv
-        . .venv/bin/activate
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        source .venv/bin/activate
+        pip install -q --upgrade pip
+        pip install -q -r requirements.txt
         
-        # Use the selected agent file
-        .venv/bin/python scripts/deploy_agent.py "$FOUNDRY_ENDPOINT" "agents/${{ parameters.agentFile }}"
+        # Deploy agent (uses DefaultAzureCredential with AzureCLI context)
+        .venv/bin/python -m scripts.deploy_agent "$(FOUNDRY_ENDPOINT)" "agents/${{ parameters.agentFile }}"

@@ -1,6 +1,0 @@
-name: get_weather
-type: openapi
-description: Retrieve weather information for a location
-spec_path: api.json
-auth:
-  type: anonymous

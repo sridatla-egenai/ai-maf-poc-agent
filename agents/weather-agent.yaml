@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://aka.ms/microsoft-foundry-vsc/agent/1.0.0
+version: 1.0.0
+name: weather-agent
+
+description: Agent that provides weather information using wttr.in API
+
+id: ""
+
+metadata:
+  author: "platform_team"
+  tag: "env:nonprd"
+
+model:
+  id: "gpt-5-mini"
+  options:
+    temperature: 0.7
+    top_p: 1
+
+instructions: >-
+  You are a helpful weather assistant. When someone asks about weather in a city,
+  use the `weather-tool` tool to fetch current weather data.
+  
+  Always provide:
+  - Current temperature
+  - Weather conditions
+  - Any relevant weather alerts
+  
+  Keep responses concise and friendly.
+
+
+tools:
+  - type: openapi
+    id: weathertool
+    description: Get current weather data for any location
+    options:
+      specification: file://infrastructure/modules/foundry_connection/api.json
+      tool_connections: weathertool
+      auth:
+        type: 'CustomKeys'
+        parameters:
+          apiKey: 'test'  

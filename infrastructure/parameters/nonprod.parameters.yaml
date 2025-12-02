@@ -1,6 +1,0 @@
-# Non-production connection parameters
-projectName: adusa-poc-agent
-connectionName: todo-api-connection
-targetUrl: https://product-api-main-98dd1cf.zuplo.site
-connectionType: CustomKeys
-# apiKey will be provided by pipeline variable
