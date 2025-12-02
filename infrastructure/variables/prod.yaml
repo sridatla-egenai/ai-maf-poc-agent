@@ -1,0 +1,30 @@
+# Production environment variables
+environment: prod
+
+# Azure Configuration
+azure:
+  resourceGroup: rg-ai-agents-prod
+  location: eastus
+  serviceConnection: ado-service-connection-prod
+
+# AI Foundry Configuration
+foundry:
+  projectName: prod-agent
+  endpoint: https://prod-agent.services.ai.azure.com/api/projects/prod-agent
+
+# Connection Configuration
+connection:
+  name: todo-api-connection
+  targetUrl: https://api.production.example.com
+  type: CustomKeys
+  # apiKey will be provided via pipeline secret variable: TODO_API_KEY
+
+# Agent Configuration
+agent:
+  yamlPath: agents/simple-agent.yaml
+  
+# Tags
+tags:
+  environment: prod
+  managedBy: devops
+  project: ai-agents

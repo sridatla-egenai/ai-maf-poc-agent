@@ -1,0 +1,30 @@
+# Non-production environment variables
+environment: nonprod
+
+# Azure Configuration
+azure:
+  resourceGroup: rg-ai-agents-nonprod
+  location: eastus
+  serviceConnection: ado-service-connection
+
+# AI Foundry Configuration
+foundry:
+  projectName: adusa-poc-agent
+  endpoint: https://adusa-poc-agent.services.ai.azure.com/api/projects/adusa-poc-agent
+
+# Connection Configuration
+connection:
+  name: todo-api-connection
+  targetUrl: https://product-api-main-98dd1cf.zuplo.site
+  type: CustomKeys
+  # apiKey will be provided via pipeline secret variable: TODO_API_KEY
+
+# Agent Configuration
+agent:
+  yamlPath: agents/simple-agent.yaml
+  
+# Tags
+tags:
+  environment: nonprod
+  managedBy: devops
+  project: ai-agents

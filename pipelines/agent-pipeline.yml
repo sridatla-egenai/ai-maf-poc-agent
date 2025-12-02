@@ -1,0 +1,75 @@
+name: $(Date:yyyyMMdd)$(Rev:.r)-agent
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - agents/**
+      - tools/**
+      - scripts/**
+      - pipelines/agent-pipeline.yml
+    exclude:
+      - infrastructure/**
+
+# Runtime Parameters
+parameters:
+  - name: agentFile
+    displayName: 'Agent to Deploy'
+    type: string
+    default: 'simple-agent.yaml'
+    values:
+      - simple-agent.yaml
+      # Add other agent YAML files here as you create them
+
+variables:
+  - name: ENVIRONMENT
+    ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+      value: 'nonprod'
+    ${{ else }}:
+      value: 'prod'
+  
+  - ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+    - group: ai-agent-secrets-nonprod
+  - ${{ else }}:
+    - group: ai-agent-secrets-prod
+
+  - name: AZURE_SERVICE_CONNECTION
+    value: 'ado-service-connection'
+
+pool:
+  name: 'egen-agent-pool'
+
+steps:
+  - checkout: self
+  
+  - bash: |
+      echo "🤖 Deploying Agent to: $(ENVIRONMENT)"
+      echo "📄 Selected Agent: ${{ parameters.agentFile }}"
+    displayName: 'Show deployment info'
+  
+  - task: AzureCLI@2
+    displayName: 'Install dependencies and deploy agent'
+    inputs:
+      azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        # Load environment variables from YAML
+        python3 -c "
+        import yaml
+        with open('infrastructure/variables/$(ENVIRONMENT).yaml') as f:
+            vars = yaml.safe_load(f)
+            print(f\"FOUNDRY_ENDPOINT={vars['foundry']['endpoint']}\")
+        " > env_vars.sh
+        source env_vars.sh
+        
+        # Deploy agent
+        python3 -m venv .venv
+        . .venv/bin/activate
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+        # Use the selected agent file
+        .venv/bin/python scripts/deploy_agent.py "$FOUNDRY_ENDPOINT" "agents/${{ parameters.agentFile }}"

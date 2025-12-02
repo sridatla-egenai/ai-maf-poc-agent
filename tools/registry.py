@@ -6,6 +6,12 @@ from azure.ai.projects.models import (
     AzureAISearchAgentTool,
     FileSearchTool,
     OpenApiAgentTool,
+    OpenApiFunctionDefinition,
+    OpenApiAnonymousAuthDetails,
+    OpenApiProjectConnectionAuthDetails,
+    OpenApiProjectConnectionSecurityScheme,
+    AzureAISearchToolResource,
+    AISearchIndexResource,
     CodeInterpreterTool,
     MCPTool
 )
@@ -39,11 +45,17 @@ def build_tools_from_yaml(project_client: AIProjectClient, tools_cfg: List[Dict]
         if tool_type == "azure_ai_search":
             connection_id = options.get("connection_id", "CONN_PRIMARY_SEARCH")
             index_name = options.get("index_name", "primary-search-index")
+            
             tools.append(
                 AzureAISearchAgentTool(
-                    name=tool_id,
-                    connection_id=connection_id,
-                    index_name=index_name,
+                    azure_ai_search=AzureAISearchToolResource(
+                        indexes=[
+                            AISearchIndexResource(
+                                project_connection_id=connection_id,
+                                index_name=index_name
+                            )
+                        ]
+                    )
                 )
             )
 
@@ -56,8 +68,7 @@ def build_tools_from_yaml(project_client: AIProjectClient, tools_cfg: List[Dict]
             
             tools.append(
                 FileSearchTool(
-                    name=tool_id,
-                    vector_store_id=vector_store_id,
+                    vector_store_ids=[vector_store_id] if vector_store_id else []
                 )
             )
 
@@ -71,14 +82,18 @@ def build_tools_from_yaml(project_client: AIProjectClient, tools_cfg: List[Dict]
             if not spec_url:
                 raise ValueError(f"OpenAPI tool '{tool_id}' missing 'specification' URL")
 
-            # Check for auth config
-            auth_config = options.get("auth", {"type": "anonymous"})
-            # For now we only support anonymous in this simple registry, 
-            # but you could expand to handle connection_id based auth.
-            
-            # If a connection_id is provided for the tool itself (not just auth)
+            # Determine Auth
+            auth = OpenApiAnonymousAuthDetails()
             connection_id = options.get("connection_id")
+            
+            if connection_id:
+                auth = OpenApiProjectConnectionAuthDetails(
+                    security_scheme=OpenApiProjectConnectionSecurityScheme(
+                        project_connection_id=connection_id
+                    )
+                )
 
+<<<<<<< Updated upstream
             # Only pass supported arguments (spec_url, connection_id)
             if connection_id:
                 tools.append(
@@ -92,6 +107,20 @@ def build_tools_from_yaml(project_client: AIProjectClient, tools_cfg: List[Dict]
                     OpenApiAgentTool(
                         spec_url=spec_url
                     )
+=======
+            # Create OpenAPI Definition
+            openapi_def = OpenApiFunctionDefinition(
+                name=tool_id,
+                spec=spec_url,
+                description=t.get("description", ""),
+                auth=auth
+            )
+
+            # Wrap in Agent Tool
+            tools.append(
+                OpenApiAgentTool(
+                    openapi=openapi_def
+>>>>>>> Stashed changes
                 )
 
         # 4) MCP Tool
@@ -103,7 +132,7 @@ def build_tools_from_yaml(project_client: AIProjectClient, tools_cfg: List[Dict]
             
             tools.append(
                 MCPTool(
-                    name=tool_id,
+                    server_label=tool_id,
                     server_url=server_url,
                     allowed_tools=allowed_tools,
                 )
@@ -112,12 +141,7 @@ def build_tools_from_yaml(project_client: AIProjectClient, tools_cfg: List[Dict]
         # 5) Code interpreter
         elif tool_type == "code_interpreter":
             tools.append(
-                CodeInterpreterTool(
-                    name=tool_id,
-                    # Optional overrides
-                    max_execution_time_seconds=options.get("max_execution_time_seconds"),
-                    memory_limit_mb=options.get("memory_limit_mb"),
-                )
+                CodeInterpreterTool()
             )
             
         # 6) Bing Connection (if treated as a tool type or connection)

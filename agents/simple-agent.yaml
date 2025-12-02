@@ -43,6 +43,5 @@ tools:
     id: todosearch
     description: Search the web for information on any topic
     options:
-      specification: https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/ai/azure-ai-projects/assets/web_search_openapi.json
-      auth:
-        type: anonymous
+      specification: https://product-api-main-98dd1cf.zuplo.site/api/todo
+      connection_id: todo-api-connection
