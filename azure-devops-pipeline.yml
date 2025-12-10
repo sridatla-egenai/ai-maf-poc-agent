@@ -143,14 +143,9 @@ stages:
               echo "=============================================="
             displayName: '📋 Show deployment info'
           
-          - task: UsePythonVersion@0
-            displayName: '🐍 Set up Python'
-            inputs:
-              versionSpec: '3.10'
-          
           - bash: |
               echo "Installing dependencies..."
-              pip install -r requirements.txt
+              python3 -m pip install -q -r requirements.txt
             displayName: '📦 Install dependencies'
           
           - task: AzureCLI@2
@@ -202,13 +197,8 @@ stages:
         steps:
           - checkout: self
           
-          - task: UsePythonVersion@0
-            displayName: '🐍 Set up Python'
-            inputs:
-              versionSpec: '3.10'
-          
           - bash: |
-              pip install pyyaml
+              python3 -m pip install -q pyyaml
             displayName: '📦 Install PyYAML'
           
           - bash: |
@@ -287,14 +277,9 @@ stages:
         steps:
           - checkout: self
           
-          - task: UsePythonVersion@0
-            displayName: '🐍 Set up Python'
-            inputs:
-              versionSpec: '3.10'
-          
           - bash: |
               echo "Installing dependencies..."
-              pip install -r requirements.txt
+              python3 -m pip install -q -r requirements.txt
             displayName: '📦 Install dependencies'
           
           - task: AzureCLI@2
