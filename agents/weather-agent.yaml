@@ -33,7 +33,7 @@ tools:
     id: weathertool
     description: Get current weather data for any location
     options:
-      specification: file://infrastructure/modules/foundry_connection/api.json
+      #specification: file://infrastructure/modules/connections/api.json
       tool_connections: weathertool
       auth:
         type: 'CustomKeys'
