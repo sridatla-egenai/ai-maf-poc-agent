@@ -144,8 +144,11 @@ stages:
             displayName: '📋 Show deployment info'
           
           - bash: |
+              echo "Creating virtual environment..."
+              python3 -m venv .venv
+              source .venv/bin/activate
               echo "Installing dependencies..."
-              python3 -m pip install -q -r requirements.txt
+              pip install -q -r requirements.txt
             displayName: '📦 Install dependencies'
           
           - task: AzureCLI@2
@@ -167,7 +170,8 @@ stages:
               scriptLocation: inlineScript
               inlineScript: |
                 echo "Deploying connections..."
-                python3 scripts/deploy_infrastructure.py foundry_connection \
+                source .venv/bin/activate
+                python scripts/deploy_infrastructure.py foundry_connection \
                   --bicepparam infrastructure/parameters/connections/connections.bicepparam
                 
                 echo "✅ Connections deployed successfully"
@@ -198,7 +202,10 @@ stages:
           - checkout: self
           
           - bash: |
-              python3 -m pip install -q pyyaml
+              echo "Creating virtual environment..."
+              python3 -m venv .venv
+              source .venv/bin/activate
+              pip install -q pyyaml
             displayName: '📦 Install PyYAML'
           
           - bash: |
@@ -221,7 +228,8 @@ stages:
               fi
               
               # Parse agent YAML and check for tool dependencies
-              python3 << 'EOF'
+              source .venv/bin/activate
+              python << 'EOF'
               import yaml
               import sys
               import os
@@ -278,8 +286,11 @@ stages:
           - checkout: self
           
           - bash: |
+              echo "Creating virtual environment..."
+              python3 -m venv .venv
+              source .venv/bin/activate
               echo "Installing dependencies..."
-              python3 -m pip install -q -r requirements.txt
+              pip install -q -r requirements.txt
             displayName: '📦 Install dependencies'
           
           - task: AzureCLI@2
@@ -303,7 +314,8 @@ stages:
                 echo "Endpoint: $(AI_FOUNDRY_ENDPOINT)"
                 echo ""
                 
-                python3 -m scripts.deploy_agent \
+                source .venv/bin/activate
+                python -m scripts.deploy_agent \
                   "$(AI_FOUNDRY_ENDPOINT)" \
                   "$AGENT_FILE"
                 
