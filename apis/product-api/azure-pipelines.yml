@@ -1,0 +1,64 @@
+trigger: none
+
+parameters:
+  - name: azureServiceConnection
+    displayName: 'Azure Subscription Service Connection'
+    type: string
+    default: 'azure-connection'
+  - name: acrName
+    displayName: 'Azure Container Registry Name (without .azurecr.io)'
+    type: string
+    default: 'myacr'
+  - name: buildContext
+    displayName: 'Build Context (Directory)'
+    type: string
+    default: 'ai-maf-poc-agent/apis/product-api'
+  - name: dockerfilePath
+    displayName: 'Path to Dockerfile (relative to Build Context)'
+    type: string
+    default: 'Dockerfile'
+  - name: imageName
+    displayName: 'Image Repository Name'
+    type: string
+    default: 'product-api'
+
+variables:
+  # Auto-incrementing version based on Build ID
+  tag: '$(Build.BuildId)'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: AzureCLI@2
+  displayName: 'Login to ACR and Build/Push'
+  inputs:
+    azureSubscription: ${{ parameters.azureServiceConnection }}
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      set -e
+      
+      # Login to ACR
+      echo "Logging into ACR: ${{ parameters.acrName }}..."
+      az acr login --name ${{ parameters.acrName }}
+      
+      # Construct full image name
+      ACR_LOGIN_SERVER="${{ parameters.acrName }}.azurecr.io"
+      FULL_IMAGE_NAME="$ACR_LOGIN_SERVER/${{ parameters.imageName }}"
+      
+      echo "Building $FULL_IMAGE_NAME:$(tag)..."
+      
+      # Change to build context
+      echo "Changing directory to ${{ parameters.buildContext }}..."
+      cd ${{ parameters.buildContext }}
+
+      # Build
+      docker build -f ${{ parameters.dockerfilePath }} -t $FULL_IMAGE_NAME:$(tag) -t $FULL_IMAGE_NAME:latest .
+      
+      # Push
+      echo "Pushing images..."
+      docker push $FULL_IMAGE_NAME:$(tag)
+      docker push $FULL_IMAGE_NAME:latest
+      
+      echo "Successfully pushed $FULL_IMAGE_NAME:$(tag)"

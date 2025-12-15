@@ -1,0 +1,21 @@
+services:
+  product-api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  mcp-server:
+    build: ./mcp-server
+    ports:
+      - "8001:8001"
+    environment:
+      - PRODUCT_API_URL=http://product-api:8000
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - product-api
+    volumes:
+      - ./mcp-server:/app
