@@ -39,9 +39,10 @@ steps:
     inlineScript: |
       set -e
       
-      # Login to ACR
+      # Login to ACR using token (more robust)
       echo "Logging into ACR: ${{ parameters.acrName }}..."
-      az acr login --name ${{ parameters.acrName }}
+      TOKEN=$(az acr login --name ${{ parameters.acrName }} --expose-token --output tsv --query accessToken)
+      docker login ${{ parameters.acrName }}.azurecr.io --username 00000000-0000-0000-0000-000000000000 --password "$TOKEN"
       
       # Construct full image name
       ACR_LOGIN_SERVER="${{ parameters.acrName }}.azurecr.io"
