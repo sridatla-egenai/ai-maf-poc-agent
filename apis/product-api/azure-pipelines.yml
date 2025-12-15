@@ -39,27 +39,16 @@ steps:
     inlineScript: |
       set -e
       
-      # Login to ACR using token (more robust)
-      echo "Logging into ACR: ${{ parameters.acrName }}..."
-      TOKEN=$(az acr login --name ${{ parameters.acrName }} --expose-token --output tsv --query accessToken)
-      docker login ${{ parameters.acrName }}.azurecr.io --username 00000000-0000-0000-0000-000000000000 --password "$TOKEN"
-      
-      # Construct full image name
-      ACR_LOGIN_SERVER="${{ parameters.acrName }}.azurecr.io"
-      FULL_IMAGE_NAME="$ACR_LOGIN_SERVER/${{ parameters.imageName }}"
-      
-      echo "Building $FULL_IMAGE_NAME:$(tag)..."
-      
       # Change to build context
       echo "Changing directory to ${{ parameters.buildContext }}..."
       cd ${{ parameters.buildContext }}
 
-      # Build
-      docker build -f ${{ parameters.dockerfilePath }} -t $FULL_IMAGE_NAME:$(tag) -t $FULL_IMAGE_NAME:latest .
+      # Use ACR Build (runs in the cloud, does not require Docker on the agent)
+      echo "Building and Pushing to ACR: ${{ parameters.acrName }}..."
       
-      # Push
-      echo "Pushing images..."
-      docker push $FULL_IMAGE_NAME:$(tag)
-      docker push $FULL_IMAGE_NAME:latest
-      
-      echo "Successfully pushed $FULL_IMAGE_NAME:$(tag)"
+      az acr build \
+        --registry ${{ parameters.acrName }} \
+        --image ${{ parameters.imageName }}:$(tag) \
+        --image ${{ parameters.imageName }}:latest \
+        --file ${{ parameters.dockerfilePath }} \
+        .
