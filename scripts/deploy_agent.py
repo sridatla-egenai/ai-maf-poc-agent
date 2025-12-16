@@ -21,7 +21,7 @@ import sys
 import os
 import yaml
 from pathlib import Path
-from azure.ai.projects import AIProjectClient
+from azure.ai.agents import AgentsClient
 from azure.identity import DefaultAzureCredential, AzureCliCredential
 #from azure.ai.projects.models import ImageBasedHostedAgentDefinition, ProtocolVersionRecord, AgentProtocol
 from azure.ai.projects.models import PromptAgentDefinition
@@ -93,7 +93,7 @@ def deploy_agent(
     try:
         # Try DefaultAzureCredential first (checks environment, az cli, managed identity, etc.)
         credential = DefaultAzureCredential(exclude_shared_token_cache_credential=False)
-        client = AIProjectClient(
+        client = AgentsClient(
             endpoint=endpoint,
             credential=credential
         )
@@ -107,7 +107,7 @@ def deploy_agent(
             from azure.identity import AzureCliCredential
             print("  Attempting to use Azure CLI credentials...")
             credential = AzureCliCredential()
-            client = AIProjectClient(
+            client = AgentsClient(
                 endpoint=endpoint,
                 credential=credential
             )
@@ -131,13 +131,11 @@ def deploy_agent(
             print(f"Attaching {len(tools)} tools to agent...")
 
         print("Deploying agent to Foundry...")
-        agent = client.agents.create_version(
-            agent_name=agent_name,
-            definition=PromptAgentDefinition(
-                model=model_id,
-                instructions=agent_def.get('instructions', 'You are a helpful assistant that answers general questions'),
-                tools=tools
-            ),
+        agent = client.create_agent(
+            model=model_id,
+            name=agent_name,
+            instructions=agent_def.get('instructions', 'You are a helpful assistant that answers general questions'),
+            tools=tools
         )
         result = {
             'id': agent.id,

@@ -1,5 +1,5 @@
 from typing import List, Dict
-from azure.ai.projects import AIProjectClient
+from azure.ai.agents import AgentsClient
 from azure.ai.projects.models import (
     AzureAISearchAgentTool,
     FileSearchTool,
@@ -15,7 +15,7 @@ from azure.ai.projects.models import (
 )
 
 
-def build_tools_from_yaml(project_client: AIProjectClient, tools_cfg: List[Dict]):
+def build_tools_from_yaml(project_client: AgentsClient, tools_cfg: List[Dict]):
     """
     Convert logical YAML tool entries into concrete Tool objects
     for Azure AI Foundry Agent Service.
