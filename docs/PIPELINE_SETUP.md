@@ -102,7 +102,7 @@ metadata:
   tag: "env:nonprd"
 
 model:
-  id: gpt-5-mini
+  id: gpt-4o
 
 instructions: |
   You are a helpful weather assistant.
